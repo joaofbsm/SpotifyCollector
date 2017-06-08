@@ -9,15 +9,15 @@ import MySQLdb
 
 # WORK PLAN
 # - Get 100000 artists and parse the data -> Populate Artist, ArtistGenre, ArtistAlbum(Missing in doc)
-# - Get Album data from those artists -> Populate Album, AlbumGenre, AlbumTrack
+# - Get Album data from those artists -> Populate Album, AlbumTrack
 # - Get Track data from those albums -> Populate Track, TrackArtist
 # - Get Playlist by searching by Category, e.g., Party -> Populate Playlist, User, Track, PlaylistTrack(Missing in doc)
 
 # TODO
 # - Check if the API will accept all those requests. If not, simplify DB by using simplified object types.
-# - Maybe remove AlbumGenre
 # - Recheck pass on exceptions for relationship table insertions
 # - Use argparse
+# - Create README
 
 #==============================OUTPUT SETUP===============================#
 
@@ -59,10 +59,6 @@ insert_artist_album = ("INSERT INTO ArtistAlbum "
 insert_album = ("INSERT INTO Album "
 				"(id, name, album_type, release_date, popularity) " 
 				"VALUES (%s, %s, %s, %s, %s)")
-
-insert_album_genre = ("INSERT INTO AlbumGenre "
-						"(album_id, genre) "
-						"VALUES (%s, %s)")
 
 insert_album_track = ("INSERT INTO AlbumTrack "
 						"(album_id, track_id, disc_number, track_number) "
@@ -137,7 +133,6 @@ def save_artist_album(artist, album):
 
 def save_entire_album(album):
 	save_album(album)
-	save_album_genre(album)
 	save_album_tracks(album)
 
 def save_album(album):
@@ -146,14 +141,6 @@ def save_album(album):
 		cursor.execute(insert_album, (album['id'], album['name'], album['album_type'], album['release_date'], album['popularity']))
 	except MySQLdb.IntegrityError:  
 		pass
-
-def save_album_genre(album):
-	for genre in album['genres']:
-		vprint("[INSERT][ALBUM_GENRE]", album['name'], ",", genre)
-		try:
-			cursor.execute(insert_album_genre, (album['id'], genre))
-		except MySQLdb.IntegrityError:  
-			pass
 
 def save_album_tracks(album):
 	tracks = album['tracks']['items']
@@ -195,7 +182,7 @@ if len(sys.argv) > 1:
 	username = sys.argv[1]
 	limit = int(sys.argv[2])
 else:
-	print "Usage: %s username limit output_mode" % (sys.argv[0],)
+	print "usage: %s username limit output_mode" % (sys.argv[0],)
 	sys.exit()
 
 scope = 'user-library-read'
