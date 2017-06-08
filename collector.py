@@ -15,9 +15,19 @@ import MySQLdb
 
 # TODO
 # - Check if the API will accept all those requests. If not, simplify DB by using simplified object types.
-# - Maybe stop artist recursion and simply add their names for the current album
 # - Maybe remove AlbumGenre
 # - Recheck pass on exceptions for relationship table insertions
+# - Use argparse
+
+#==============================OUTPUT SETUP===============================#
+
+if sys.argv[3] == "-v":  # Print if verbose flag was set
+	def vprint(*args):
+		for arg in args:
+			print arg,
+		print
+else:   
+	vprint = lambda *a: None  # Do-nothing function
 
 pp = pprint.PrettyPrinter(indent=1)  # PrettyPrinter setup for better JSON visualization
 
@@ -81,13 +91,13 @@ def get_track(id):
 	return sp.track(id)
 
 # Saves artist and all of it's relations
-def save_entire_artist(artist): 
+def save_entire_artist(artist, album_flag=False): 
 	save_artist(artist)
 	save_artist_genre(artist)
-	save_artist_albums(artist)
+	if album_flag: save_artist_albums(artist)  # Adds artists by recursion
 
 def save_artist(artist):
-	print "[INSERT][ARTIST]", artist['name']
+	vprint("[INSERT][ARTIST]", artist['name'])
 	try:
 		cursor.execute(insert_artist, (artist['id'], artist['name'], artist['popularity']))
 	except MySQLdb.IntegrityError:  # Impeeds duplicate tuple error from stopping execution
@@ -95,7 +105,7 @@ def save_artist(artist):
 
 def save_artist_genre(artist): 
 	for genre in artist['genres']:
-		print "[INSERT][ARTIST_GENRE]", artist['name'], ",", genre
+		vprint("[INSERT][ARTIST_GENRE]", artist['name'], ",", genre)
 		try:
 			cursor.execute(insert_artist_genre, (artist['id'], genre))
 		except MySQLdb.IntegrityError:
@@ -118,10 +128,11 @@ def save_artist_albums(artist):
 						print "[ERROR]["+ str(err[0]) +"]", err[1]
 						artist = get_artist(artist['id'])
 						save_entire_artist(artist)
+						save_artist_album(artist, album)
 			seen.add(album['name'])
 
 def save_artist_album(artist, album):
-	print "[INSERT][ARTIST_ALBUM]", artist['name'], ",", album['name']
+	vprint("[INSERT][ARTIST_ALBUM]", artist['name'], ",", album['name'])
 	cursor.execute(insert_artist_album, (artist['id'], album['id']))
 
 def save_entire_album(album):
@@ -130,7 +141,7 @@ def save_entire_album(album):
 	save_album_tracks(album)
 
 def save_album(album):
-	print "[INSERT][ALBUM]", album['name']
+	vprint("[INSERT][ALBUM]", album['name'])
 	try:
 		cursor.execute(insert_album, (album['id'], album['name'], album['album_type'], album['release_date'], album['popularity']))
 	except MySQLdb.IntegrityError:  
@@ -138,7 +149,7 @@ def save_album(album):
 
 def save_album_genre(album):
 	for genre in album['genres']:
-		print "[INSERT][ALBUM_GENRE]", album['name'], ",", genre
+		vprint("[INSERT][ALBUM_GENRE]", album['name'], ",", genre)
 		try:
 			cursor.execute(insert_album_genre, (album['id'], genre))
 		except MySQLdb.IntegrityError:  
@@ -151,16 +162,20 @@ def save_album_tracks(album):
 		save_entire_track(track)
 		save_album_track(album, track)
 
+
 def save_album_track(album, track):
-	print "[INSERT][ALBUM_TRACK]", album['name'], ",", track['name']
-	cursor.execute(insert_album_track, (album['id'], track['id'], track['disc_number'], track['track_number']))
+	vprint("[INSERT][ALBUM_TRACK]", album['name'], ",", track['name'])
+	try:
+		cursor.execute(insert_album_track, (album['id'], track['id'], track['disc_number'], track['track_number']))
+	except MySQLdb.IntegrityError:  
+		pass
 
 def save_entire_track(track):
 	save_track(track)
 	save_track_artist(track)
 
 def save_track(track):
-	print "[INSERT][TRACK]", track['name']
+	vprint("[INSERT][TRACK]", track['name'])
 	try:
 		cursor.execute(insert_track, (track['id'], track['name'], track['duration_ms'], int(track['explicit'] == 'true'), track['popularity']))
 	except MySQLdb.IntegrityError:  
@@ -168,7 +183,7 @@ def save_track(track):
 
 def save_track_artist(track):
 	for artist in track['artists']:
-		print "[INSERT][TRACK_ARTIST]", track['name'], ",", artist['name']
+		vprint("[INSERT][TRACK_ARTIST]", track['name'], ",", artist['name'])
 		try:
 			cursor.execute(insert_track_artist, (track['id'], artist['id']))
 		except MySQLdb.IntegrityError:  
@@ -180,7 +195,7 @@ if len(sys.argv) > 1:
 	username = sys.argv[1]
 	limit = int(sys.argv[2])
 else:
-	print "Usage: %s username limit" % (sys.argv[0],)
+	print "Usage: %s username limit output_mode" % (sys.argv[0],)
 	sys.exit()
 
 scope = 'user-library-read'
@@ -197,12 +212,12 @@ if token:
 	for i in range(limit / 50):
 		artists = get_all_artists(50, offset)['artists']['items']
 		for artist in artists:
-			save_entire_artist(artist)
+			save_entire_artist(artist, album_flag=True)
 		offset += 50
 	remainder = limit % 50
 	artists = get_all_artists(remainder, offset)['artists']['items']
 	for artist in artists:
-		save_entire_artist(artist)
+		save_entire_artist(artist, album_flag=True)
 
 else:
 	print "Can't get token for", username
