@@ -1,0 +1,5 @@
+USE spotify;
+
+DELETE FROM Album;
+DELETE FROM Track;
+DELETE FROM Artist;
