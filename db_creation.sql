@@ -1,6 +1,9 @@
-CREATE TABLE Album (id VARCHAR(50), name VARCHAR(100), release_date VARCHAR(10), popularity INT(10) UNSIGNED, PRIMARY KEY(id));
+CREATE DATABASE spotify;
+USE spotify;
+
+CREATE TABLE Album (id VARCHAR(50), name VARCHAR(500), album_type VARCHAR(20), release_date VARCHAR(20), popularity INT(10) UNSIGNED, PRIMARY KEY(id));
 CREATE TABLE Artist (id VARCHAR(50), name VARCHAR(100), popularity INT(10) UNSIGNED, PRIMARY KEY(id));
-CREATE TABLE Playlist (id VARCHAR(50), name VARCHAR(100), owner VARCHAR(50), description VARCHAR(500), collaborative BOOLEAN, public BOOLEAN, FOREIGN KEY(owner) REFERENCES User(id) ON DELETE RESTRICT, PRIMARY KEY(id));
+CREATE TABLE Playlist (id VARCHAR(50), name VARCHAR(100), owner VARCHAR(50), description VARCHAR(1000), collaborative BOOLEAN, public BOOLEAN, FOREIGN KEY(owner) REFERENCES User(id) ON DELETE RESTRICT, PRIMARY KEY(id));
 CREATE TABLE Track (id VARCHAR(50), name VARCHAR(100), duration_ms INT(10) UNSIGNED, explicit BOOLEAN, popularity INT(10) UNSIGNED, PRIMARY KEY(id));
 CREATE TABLE User (id VARCHAR(50), display_name VARCHAR(100), PRIMARY KEY(id));
 
