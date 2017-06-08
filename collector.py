@@ -15,6 +15,11 @@ import MySQLdb
 
 # TODO
 # - Check if the API will accept all those requests. If not, simplify DB by using simplified object types.
+# - Maybe stop artist recursion and simply add their names for the current album
+# - Maybe remove AlbumGenre
+# - Recheck pass on exceptions for relationship table insertions
+
+pp = pprint.PrettyPrinter(indent=1)  # PrettyPrinter setup for better JSON visualization
 
 #================================DB SETUP=================================#
 
@@ -26,8 +31,6 @@ db.set_character_set('utf8')
 cursor.execute('SET NAMES utf8;')
 cursor.execute('SET CHARACTER SET utf8;')
 cursor.execute('SET character_set_connection=utf8;')
-
-pp = pprint.PrettyPrinter(indent=1)  # PrettyPrinter setup for better JSON visualization
 
 #===============================SQL QUERIES===============================#
 
@@ -51,6 +54,18 @@ insert_album_genre = ("INSERT INTO AlbumGenre "
 						"(album_id, genre) "
 						"VALUES (%s, %s)")
 
+insert_album_track = ("INSERT INTO AlbumTrack "
+						"(album_id, track_id, disc_number, track_number) "
+						"VALUES (%s, %s, %s, %s)")
+
+insert_track = ("INSERT INTO Track "
+				"(id, name, duration_ms, explicit, popularity) " 
+				"VALUES (%s, %s, %s, %s, %s)")
+
+insert_track_artist = ("INSERT INTO TrackArtist "
+						"(track_id, artist_id) "
+						"VALUES (%s, %s)")
+
 #=================================MODULES=================================#
 
 def get_all_artists(limit, offset):
@@ -61,6 +76,9 @@ def get_artist(id):
 
 def get_album(id):
 	return sp.album(id)
+
+def get_track(id):
+	return sp.track(id)
 
 # Saves artist and all of it's relations
 def save_entire_artist(artist): 
@@ -85,18 +103,14 @@ def save_artist_genre(artist):
 
 def save_artist_albums(artist):
 	albums = sp.artist_albums(artist['id'], limit=50)['items']  # Retrieves 50 albums at most
-	#pp.pprint(albums)
-	seen = set()  # Avoid duplicates
 	albums.sort(key=lambda album:album['name'].lower())
+	seen = set()  # Avoid duplicates
 	for album in albums:
 		if album['name'] not in seen:
-			#pp.pprint(album)
 			album = get_album(album['id'])  # Retrieves full album object
-			#pp.pprint(album)
 			save_entire_album(album)
-			#print "[INFO][ALBUM]", album['name'],"[ARTISTS]",
+
 			for artist in album['artists']:
-			#	print artist['name'],
 				try:
 					save_artist_album(artist, album)
 				except MySQLdb.IntegrityError as err: 
@@ -104,7 +118,6 @@ def save_artist_albums(artist):
 						print "[ERROR]["+ str(err[0]) +"]", err[1]
 						artist = get_artist(artist['id'])
 						save_entire_artist(artist)
-			#print
 			seen.add(album['name'])
 
 def save_artist_album(artist, album):
@@ -114,7 +127,7 @@ def save_artist_album(artist, album):
 def save_entire_album(album):
 	save_album(album)
 	save_album_genre(album)
-	#save_album_tracks(album)
+	save_album_tracks(album)
 
 def save_album(album):
 	print "[INSERT][ALBUM]", album['name']
@@ -132,22 +145,34 @@ def save_album_genre(album):
 			pass
 
 def save_album_tracks(album):
-	pass
+	tracks = album['tracks']['items']
+	for track in tracks:
+		track = get_track(track['id'])
+		save_entire_track(track)
+		save_album_track(album, track)
 
-def show_artist_albums(artist):
-	albums = []
-	results = sp.artist_albums(artist['id'], album_type='album')
-	albums.extend(results['items'])
-	while results['next']:
-		results = sp.next(results)
-		albums.extend(results['items'])
-	seen = set() # to avoid dups
-	albums.sort(key=lambda album:album['name'].lower())
-	for album in albums:
-		name = album['name']
-		if name not in seen:
-			print((' ' + name))
-			seen.add(name)
+def save_album_track(album, track):
+	print "[INSERT][ALBUM_TRACK]", album['name'], ",", track['name']
+	cursor.execute(insert_album_track, (album['id'], track['id'], track['disc_number'], track['track_number']))
+
+def save_entire_track(track):
+	save_track(track)
+	save_track_artist(track)
+
+def save_track(track):
+	print "[INSERT][TRACK]", track['name']
+	try:
+		cursor.execute(insert_track, (track['id'], track['name'], track['duration_ms'], int(track['explicit'] == 'true'), track['popularity']))
+	except MySQLdb.IntegrityError:  
+		pass	
+
+def save_track_artist(track):
+	for artist in track['artists']:
+		print "[INSERT][TRACK_ARTIST]", track['name'], ",", artist['name']
+		try:
+			cursor.execute(insert_track_artist, (track['id'], artist['id']))
+		except MySQLdb.IntegrityError:  
+			pass
 
 #===================================MAIN==================================#
 
@@ -184,5 +209,3 @@ else:
 
 cursor.close()
 db.close()
-
-
