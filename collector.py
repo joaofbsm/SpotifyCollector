@@ -51,7 +51,7 @@ check_artist = ("SELECT COUNT(1) "
 
 check_album = ("SELECT COUNT(1) "
 				"FROM Album "
-				"WHERE id = %s")
+				"WHERE name = %s")
 
 check_track = ("SELECT COUNT(1) "
 				"FROM Track "
@@ -66,8 +66,8 @@ check_user = ("SELECT COUNT(1) "
 				"WHERE id = %s")
 
 insert_artist = ("INSERT INTO Artist "
-				"(id, name, popularity) "
-				"VALUES (%s, %s, %s)")
+				"(id, name, followers, popularity) "
+				"VALUES (%s, %s, %s, %s)")
 
 insert_artist_genre = ("INSERT INTO ArtistGenre "
 						"(artist_id, genre) "
@@ -94,16 +94,16 @@ insert_track_artist = ("INSERT INTO TrackArtist "
 						"VALUES (%s, %s)")
 
 insert_playlist = ("INSERT INTO Playlist "
-				"(id, name, owner, description, collaborative, public) " 
-				"VALUES (%s, %s, %s, %s, %s, %s)")
+				"(id, name, owner, description, followers, collaborative, public) " 
+				"VALUES (%s, %s, %s, %s, %s, %s, %s)")
 
 insert_playlist_track = ("INSERT INTO PlaylistTrack "
 						"(playlist_id, track_id) " 
 						"VALUES (%s, %s)")
 
 insert_user = ("INSERT INTO User "
-				"(id, display_name) " 
-				"VALUES (%s, %s)")
+				"(id, display_name, followers) " 
+				"VALUES (%s, %s, %s)")
 
 #=================================METHODS=================================#
 
@@ -112,7 +112,7 @@ def exists_artist(artist):
 	return list(cursor)[0][0]
 
 def exists_album(album):
-	cursor.execute(check_album, [album['id']])
+	cursor.execute(check_album, [album['name']])  # Searches by name because duplicates have different ids
 	return list(cursor)[0][0]
 
 def exists_track(track):
@@ -144,7 +144,7 @@ def get_user(id):
 
 def save_artist(artist):
 	vprint("[INSERT][ARTIST]", artist['name'])
-	cursor.execute(insert_artist, (artist['id'], artist['name'], artist['popularity']))
+	cursor.execute(insert_artist, (artist['id'], artist['name'], artist['followers']['total'], artist['popularity']))
 
 def save_artist_genre(artist): 
 	for genre in artist['genres']:
@@ -176,7 +176,7 @@ def save_playlist(playlist):
 	if not exists_user(playlist['owner']):
 		user = get_user(playlist['owner']['id'])
 		save_user(user)
-	cursor.execute(insert_playlist, (playlist['id'], playlist['name'], playlist['owner']['id'], playlist['description'], int(playlist['collaborative'] == True), int(playlist['public'] == True)))
+	cursor.execute(insert_playlist, (playlist['id'], playlist['name'], playlist['owner']['id'], playlist['description'], playlist['followers']['total'], int(playlist['collaborative'] == True), int(playlist['public'] == True)))
 
 def save_playlist_track(playlist, track):
 	vprint("[INSERT][PLAYLIST_TRACK]", playlist['name'], ",", track['name'])
@@ -184,7 +184,7 @@ def save_playlist_track(playlist, track):
 
 def save_user(user):
 	vprint("[INSERT][USER]", user['display_name'])
-	cursor.execute(insert_user, (user['id'], user['display_name']))
+	cursor.execute(insert_user, (user['id'], user['display_name'], user['followers']['total']))
 
 def save_artist_albums(artist):
 	albums = sp.artist_albums(artist['id'], limit=50)['items']  # Retrieves 50 simple album objects at most
