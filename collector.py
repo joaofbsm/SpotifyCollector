@@ -1,11 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""Spotify Data Collector Based in Spotipy Wrapper"""
+
 import sys
 import spotipy
 import spotipy.util as util
 import pprint
 import MySQLdb
+
+__author__  = "João Francisco B. S. Martins"
+__email__   = "joaofbsm@dcc.ufmg.br"
+__license__ = "GPL"
+__version__ = "3.0"
 
 #==============================OUTPUT SETUP===============================#
 
@@ -284,7 +291,8 @@ def retrieve_all_artists(total_limit, starting_offset):
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
 			if str(err).startswith("http status: 401, code:-1"):  # The access token expired, refresh it
-				sp.auth = util.prompt_for_user_token(username, scope)
+				# Even though it is a private variable, no other method was supplied to do this operation
+				sp._auth = util.prompt_for_user_token(username, scope)  
 				continue  # Skip parameters update because this iteration was compromised
 			else:  # For a different error, raise
 				raise
@@ -307,7 +315,8 @@ def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
 			if str(err).startswith("http status: 401, code:-1"):  # The access token expired, refresh it
-				sp.auth = util.prompt_for_user_token(username, scope)
+				# Even though it is a private variable, no other method was supplied to do this operation
+				sp._auth = util.prompt_for_user_token(username, scope)
 				continue  # Skip parameters update because this iteration was compromised
 			else:
 				raise
