@@ -290,7 +290,7 @@ def retrieve_all_artists(total_limit, starting_offset):
 				save_entire_artist(artist, save_albums=True)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
-			if str(err).startswith("http status: 401, code:-1"):  # The access token expired, refresh it
+			if str(err).endswith("The access token expired"):  # The access token expired, refresh it
 				# Even though it is a private variable, no other method was supplied to do this operation
 				sp._auth = util.prompt_for_user_token(username, scope)  
 				continue  # Skip parameters update because this iteration was compromised
@@ -314,7 +314,7 @@ def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 					save_entire_playlist(playlist)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
-			if str(err).startswith("http status: 401, code:-1"):  # The access token expired, refresh it
+			if str(err).endswith("The access token expired"):  # The access token expired, refresh it
 				# Even though it is a private variable, no other method was supplied to do this operation
 				sp._auth = util.prompt_for_user_token(username, scope)
 				continue  # Skip parameters update because this iteration was compromised
