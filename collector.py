@@ -7,13 +7,9 @@ import spotipy.util as util
 import pprint
 import MySQLdb
 
-# TODO
-# - Use argparse
-# - Create README
-
 #==============================OUTPUT SETUP===============================#
 
-if len(sys.argv) > 6 and sys.argv[6] == "-v":  # Print if verbose flag was set
+if len(sys.argv) > 4 and sys.argv[4] == "-v":  # Print if verbose flag was set
 	def vprint(*args):
 		for arg in args:
 			print arg,
@@ -323,14 +319,14 @@ def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 #===================================MAIN==================================#
 
 # Command line arguments
-if len(sys.argv) >= 6:
+if len(sys.argv) >= 4:
 	username = sys.argv[1]
-	artist_limit = int(sys.argv[2])
-	artist_offset = int(sys.argv[3])
-	playlist_limit = int(sys.argv[4])
-	playlist_offset = int(sys.argv[5])
+	artist_limit = int(sys.argv[2].split(',')[0])
+	artist_offset = int(sys.argv[2].split(',')[1])
+	playlist_limit = int(sys.argv[3].split(',')[0])
+	playlist_offset = int(sys.argv[3].split(',')[1])
 else:
-	print "usage: %s username artist_limit artist_offset playlist_limit playlist_offset [-v]" % (sys.argv[0],)
+	print "usage: %s username artist_limit,artist_offset playlist_limit,playlist_offset [-v]" % (sys.argv[0],)
 	sys.exit()
 
 scope = 'user-library-read'
