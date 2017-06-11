@@ -11,7 +11,7 @@ import MySQLdb
 # - Use argparse
 # - Create README
 # - Add some comments
-# - Change retrieve to use the "next" field
+# - Change retrieve to use the "next" field OR make code simpler
 
 #==============================OUTPUT SETUP===============================#
 
@@ -65,6 +65,10 @@ check_artist_album = ("SELECT COUNT(1) "
 check_album_track = ("SELECT COUNT(1) "
 					"FROM AlbumTrack "
 					"WHERE album_id = %s AND track_id = %s")
+
+check_track_artist = ("SELECT COUNT(1) "
+					"FROM TrackArtist "
+					"WHERE track_id = %s AND artist_id = %s")
 
 check_playlist_track = ("SELECT COUNT(1) "
 						"FROM PlaylistTrack "
@@ -140,6 +144,10 @@ def exists_album_track(album, track):
 	cursor.execute(check_album_track, (album['id'], track['id']))
 	return list(cursor)[0][0]
 
+def exists_track_artist(track, artist):
+	cursor.execute(check_track_artist, (track['id'], artist['id']))
+	return list(cursor)[0][0]	
+
 def exists_playlist_track(playlist, track):
 	cursor.execute(check_playlist_track, (playlist['id'], track['id']))
 	return list(cursor)[0][0]
@@ -205,13 +213,16 @@ def save_user(user):
 
 def save_artist_albums(artist):
 	albums = sp.artist_albums(artist['id'], limit=50)['items']  # Retrieves 50 simple album objects at most
+
 	albums.sort(key=lambda album:album['name'].lower())  # Sort albums in alphabetical order
 	seen = set()  # Avoid duplicates(There are lots in Spotify)
+
 	for album in albums:
-		if album['name'] not in seen:
+		if album['name'] not in seen and not exists_album(album):
 			album = get_album(album['id'])  # Retrieves full album object
 			save_entire_album(album)
-			for artist in album['artists']:
+
+			for artist in album['artists']:			
 				artist = get_artist(artist['id'])
 				save_entire_artist(artist)
 				if not exists_artist_album(artist, album):
@@ -220,6 +231,7 @@ def save_artist_albums(artist):
 
 def save_album_tracks(album):
 	tracks = album['tracks']['items']
+
 	for track in tracks:
 		track = get_track(track['id'])  # Retrieves full track object
 		if not exists_track(track): 
@@ -237,15 +249,14 @@ def save_playlist_tracks(playlist):
 
 # Saves artist and all of it's relations
 def save_entire_artist(artist, save_albums=False): 
-	if not exists_artist(artist):  # Only check for those two because maybe not all albums from an artist have been saved
+	if not exists_artist(artist):  # Needs to check inside this function because maybe we only want to save the albums
 		save_artist(artist)
 		save_artist_genre(artist)
 
 	if save_albums: save_artist_albums(artist)  # If this is set in inner calls, starts artists recursion
 
 def save_entire_album(album):
-	if not exists_album(album):
-		save_album(album)
+	save_album(album)
 	save_album_tracks(album)
 
 def save_entire_track(track, save_album=False):
@@ -258,11 +269,11 @@ def save_entire_track(track, save_album=False):
 	for artist in track['artists']:
 		artist = get_artist(artist['id'])
 		save_entire_artist(artist)
-		save_track_artist(track, artist)
+		if not exists_track_artist(track, artist):
+			save_track_artist(track, artist)
 
 def save_entire_playlist(playlist):
-	if not exists_playlist(playlist):
-		save_playlist(playlist)
+	save_playlist(playlist)
 	save_playlist_tracks(playlist)
 
 def retrieve_all_artists(limit, starting_offset):
@@ -302,8 +313,9 @@ def retrieve_all_playlists(limit, starting_offset, category_id, country):
 		try:
 			playlists = sp.category_playlists(category_id=category_id, country=country, limit=50, offset=offset)['playlists']['items']
 			for playlist in playlists:
-				playlist = get_playlist(playlist['owner']['id'], playlist['id'])  # Simplified object doesn't contain all the info we need
-				save_entire_playlist(playlist)
+				if not exists_playlist(playlist):
+					playlist = get_playlist(playlist['owner']['id'], playlist['id'])  # Retrieves full playlist object
+					save_entire_playlist(playlist)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
 			if err.startswith("http status: 401, code:-1"):  # The access token expired
@@ -318,8 +330,9 @@ def retrieve_all_playlists(limit, starting_offset, category_id, country):
 			try:
 				playlists = sp.category_playlists(category_id=category_id, country=country, limit=remainder, offset=offset)['playlists']['items']
 				for playlist in playlists:
-					playlist = get_playlist(playlist['owner']['id'], playlist['id'])
-					save_entire_playlist(playlist)
+					if not exists_playlist(playlist):
+						playlist = get_playlist(playlist['owner']['id'], playlist['id'])
+						save_entire_playlist(playlist)
 			except spotipy.client.SpotifyException as err:
 				print "[ERROR]", err
 				if err.startswith("http status: 401, code:-1"):  # The access token expired
