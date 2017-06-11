@@ -10,8 +10,6 @@ import MySQLdb
 # TODO
 # - Use argparse
 # - Create README
-# - Add some comments
-# - Change retrieve to use the "next" field OR make code simpler
 
 #==============================OUTPUT SETUP===============================#
 
@@ -42,37 +40,37 @@ check_artist = ("SELECT COUNT(1) "
 				"FROM Artist "
 				"WHERE id = %s")
 
-check_album = ("SELECT COUNT(1) "
-				"FROM Album "
-				"WHERE name = %s")
-
-check_track = ("SELECT COUNT(1) "
-				"FROM Track "
-				"WHERE id = %s")
-
-check_playlist = ("SELECT COUNT(1) "
-				"FROM Playlist "
-				"WHERE id = %s")
-
-check_user = ("SELECT COUNT(1) "
-				"FROM User "
-				"WHERE id = %s")
-
 check_artist_album = ("SELECT COUNT(1) "
 					"FROM ArtistAlbum "
 					"WHERE artist_id = %s AND album_id = %s")
+
+check_album = ("SELECT COUNT(1) "
+				"FROM Album "
+				"WHERE name = %s")
 
 check_album_track = ("SELECT COUNT(1) "
 					"FROM AlbumTrack "
 					"WHERE album_id = %s AND track_id = %s")
 
+check_track = ("SELECT COUNT(1) "
+				"FROM Track "
+				"WHERE id = %s")
+
 check_track_artist = ("SELECT COUNT(1) "
 					"FROM TrackArtist "
 					"WHERE track_id = %s AND artist_id = %s")
 
+check_playlist = ("SELECT COUNT(1) "
+				"FROM Playlist "
+				"WHERE id = %s")
+
 check_playlist_track = ("SELECT COUNT(1) "
 						"FROM PlaylistTrack "
 						"WHERE playlist_id = %s AND track_id = %s")
+
+check_user = ("SELECT COUNT(1) "
+				"FROM User "
+				"WHERE id = %s")
 
 insert_artist = ("INSERT INTO Artist "
 				"(id, name, followers, popularity) "
@@ -120,36 +118,36 @@ def exists_artist(artist):
 	cursor.execute(check_artist, [artist['id']])
 	return list(cursor)[0][0]
 
-def exists_album(album):
-	cursor.execute(check_album, [album['name']])  # Searches by name because duplicates have different ids
-	return list(cursor)[0][0]
-
-def exists_track(track):
-	cursor.execute(check_track, [track['id']])
-	return list(cursor)[0][0]
-
-def exists_playlist(playlist):
-	cursor.execute(check_playlist, [playlist['id']])
-	return list(cursor)[0][0]
-
-def exists_user(user):
-	cursor.execute(check_user, [user['id']])
-	return list(cursor)[0][0]
-
 def exists_artist_album(artist, album):
 	cursor.execute(check_artist_album, (artist['id'], album['id']))
+	return list(cursor)[0][0]
+
+def exists_album(album):
+	cursor.execute(check_album, [album['name']])  # Searches by name because duplicates have different ids
 	return list(cursor)[0][0]
 
 def exists_album_track(album, track):
 	cursor.execute(check_album_track, (album['id'], track['id']))
 	return list(cursor)[0][0]
 
+def exists_track(track):
+	cursor.execute(check_track, [track['id']])
+	return list(cursor)[0][0]
+
 def exists_track_artist(track, artist):
 	cursor.execute(check_track_artist, (track['id'], artist['id']))
 	return list(cursor)[0][0]	
 
+def exists_playlist(playlist):
+	cursor.execute(check_playlist, [playlist['id']])
+	return list(cursor)[0][0]
+
 def exists_playlist_track(playlist, track):
 	cursor.execute(check_playlist_track, (playlist['id'], track['id']))
+	return list(cursor)[0][0]
+
+def exists_user(user):
+	cursor.execute(check_user, [user['id']])
 	return list(cursor)[0][0]
 
 def get_artist(id):
@@ -249,11 +247,13 @@ def save_playlist_tracks(playlist):
 
 # Saves artist and all of it's relations
 def save_entire_artist(artist, save_albums=False): 
-	if not exists_artist(artist):  # Needs to check inside this function because maybe we only want to save the albums
+	# Existance checking is done here because maybe we only want to save the albums for an already existing artist
+	if not exists_artist(artist):  
 		save_artist(artist)
 		save_artist_genre(artist)
 
-	if save_albums: save_artist_albums(artist)  # If this is set in inner calls, starts artists recursion
+	# If this is set in inner calls of save_entire_artist, collaborators and their discography will be saved in recursion
+	if save_albums: save_artist_albums(artist)  
 
 def save_entire_album(album):
 	save_album(album)
@@ -276,74 +276,53 @@ def save_entire_playlist(playlist):
 	save_playlist(playlist)
 	save_playlist_tracks(playlist)
 
-def retrieve_all_artists(limit, starting_offset):
+def retrieve_all_artists(total_limit, starting_offset):
 	offset = starting_offset
-	for i in range(limit / 50):  # Retrieves 50 at a time(API Endpoint Max Limit/Request)
+
+	while total_limit > 0:
+		cur_limit = 50 if total_limit >= 50 else total_limit  # Retrieves a maximum of 50 at a time(API Endpoint Max Limit/Request)
 		try:
-			artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=50, offset=offset)['artists']['items']
+			artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=cur_limit, offset=offset)['artists']['items']
 			for artist in artists:
 				save_entire_artist(artist, save_albums=True)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
-			if err.startswith("http status: 401, code:-1"):  # The access token expired
+			if err.startswith("http status: 401, code:-1"):  # The access token expired, refresh it
 				sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
-				continue
-			else:
-				raise			
-		offset += 50
-	remainder = limit % 50
-	if remainder > 0:
-		while True:
-			try:
-				artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=remainder, offset=offset)['artists']['items']
-				for artist in artists:
-					save_entire_artist(artist, save_albums=True)
-			except spotipy.client.SpotifyException as err:
-				print "[ERROR]", err
-				if err.startswith("http status: 401, code:-1"):  # The access token expired
-					sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
-					continue
-				else:
-					raise
-			break
+				continue  # Skip parameters update because this iteration was compromised
+			else:  # For a different error, raise
+				raise
 
-def retrieve_all_playlists(limit, starting_offset, category_id, country):
+		# If no error occurred, go to next query		
+		total_limit -= cur_limit
+		offset += cur_limit
+
+def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 	offset = starting_offset
-	for i in range(limit / 50):  # Retrieves 50 at a time(API Endpoint Max Limit/Request)
+
+	while total_limit > 0:
+		cur_limit = 50 if total_limit >= 50 else total_limit  # Retrieves a maximum of 50 at a time(API Endpoint Max Limit/Request)
 		try:
-			playlists = sp.category_playlists(category_id=category_id, country=country, limit=50, offset=offset)['playlists']['items']
+			playlists = sp.category_playlists(category_id=category_id, country=country, limit=cur_limit, offset=offset)['playlists']['items']
 			for playlist in playlists:
 				if not exists_playlist(playlist):
 					playlist = get_playlist(playlist['owner']['id'], playlist['id'])  # Retrieves full playlist object
 					save_entire_playlist(playlist)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
-			if err.startswith("http status: 401, code:-1"):  # The access token expired
+			if err.startswith("http status: 401, code:-1"):  # The access token expired, refresh it
 				sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
-				continue
+				continue  # Skip parameters update because this iteration was compromised
 			else:
-				raise	
-		offset += 50
-	remainder = limit % 50
-	if remainder > 0:
-		while True:
-			try:
-				playlists = sp.category_playlists(category_id=category_id, country=country, limit=remainder, offset=offset)['playlists']['items']
-				for playlist in playlists:
-					if not exists_playlist(playlist):
-						playlist = get_playlist(playlist['owner']['id'], playlist['id'])
-						save_entire_playlist(playlist)
-			except spotipy.client.SpotifyException as err:
-				print "[ERROR]", err
-				if err.startswith("http status: 401, code:-1"):  # The access token expired
-					sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
-					continue
-				else:
-					raise
-			break
+				raise
+
+		# If no error occurred, go to next query		
+		total_limit -= cur_limit
+		offset += cur_limit
 
 #===================================MAIN==================================#
 
+# Command line arguments
 if len(sys.argv) >= 6:
 	username = sys.argv[1]
 	artist_limit = int(sys.argv[2])
