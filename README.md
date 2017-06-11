@@ -13,6 +13,8 @@ After everything is good to go we are still missing the database structure. Solv
 mysql> source $PATH_TO_PROJECT/create_db.sql
 ```
 
+Your own Spotify Application id, secret and redirect_uri should be set as explained [here](http://spotipy.readthedocs.io/en/latest/#authorized-requests).
+
 ## Usage
 Program call:
 ```

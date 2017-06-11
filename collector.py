@@ -283,8 +283,8 @@ def retrieve_all_artists(total_limit, starting_offset):
 				save_entire_artist(artist, save_albums=True)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
-			if err.startswith("http status: 401, code:-1"):  # The access token expired, refresh it
-				sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+			if str(err).startswith("http status: 401, code:-1"):  # The access token expired, refresh it
+				sp.auth = util.prompt_for_user_token(username, scope)
 				continue  # Skip parameters update because this iteration was compromised
 			else:  # For a different error, raise
 				raise
@@ -306,8 +306,8 @@ def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 					save_entire_playlist(playlist)
 		except spotipy.client.SpotifyException as err:
 			print "[ERROR]", err
-			if err.startswith("http status: 401, code:-1"):  # The access token expired, refresh it
-				sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+			if str(err).startswith("http status: 401, code:-1"):  # The access token expired, refresh it
+				sp.auth = util.prompt_for_user_token(username, scope)
 				continue  # Skip parameters update because this iteration was compromised
 			else:
 				raise
@@ -330,7 +330,7 @@ else:
 	sys.exit()
 
 scope = 'user-library-read'
-token = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+token = util.prompt_for_user_token(username, scope)
 
 if token:
 	sp = spotipy.Spotify(auth=token)
