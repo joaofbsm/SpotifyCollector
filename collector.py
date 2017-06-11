@@ -7,18 +7,11 @@ import spotipy.util as util
 import pprint
 import MySQLdb
 
-# WORK PLAN
-# - Get 100000 artists and parse the data -> Populate Artist, ArtistGenre, ArtistAlbum(Missing in doc)
-# - Get Album data from those artists -> Populate Album, AlbumTrack
-# - Get Track data from those albums -> Populate Track, TrackArtist
-# - Get Playlist by searching by Category, e.g., Party -> Populate Playlist, User, Track, PlaylistTrack(Missing in doc)
-
 # TODO
 # - Use argparse
 # - Create README
-# - OPTIONAL: Add followers number for every entity
-# - Create try except to treat "The access token expired"
-# - Find a way to get more users
+# - Add some comments
+# - Change retrieve to use the "next" field
 
 #==============================OUTPUT SETUP===============================#
 
@@ -64,6 +57,18 @@ check_playlist = ("SELECT COUNT(1) "
 check_user = ("SELECT COUNT(1) "
 				"FROM User "
 				"WHERE id = %s")
+
+check_artist_album = ("SELECT COUNT(1) "
+					"FROM ArtistAlbum "
+					"WHERE artist_id = %s AND album_id = %s")
+
+check_album_track = ("SELECT COUNT(1) "
+					"FROM AlbumTrack "
+					"WHERE album_id = %s AND track_id = %s")
+
+check_playlist_track = ("SELECT COUNT(1) "
+						"FROM PlaylistTrack "
+						"WHERE playlist_id = %s AND track_id = %s")
 
 insert_artist = ("INSERT INTO Artist "
 				"(id, name, followers, popularity) "
@@ -125,6 +130,18 @@ def exists_playlist(playlist):
 
 def exists_user(user):
 	cursor.execute(check_user, [user['id']])
+	return list(cursor)[0][0]
+
+def exists_artist_album(artist, album):
+	cursor.execute(check_artist_album, (artist['id'], album['id']))
+	return list(cursor)[0][0]
+
+def exists_album_track(album, track):
+	cursor.execute(check_album_track, (album['id'], track['id']))
+	return list(cursor)[0][0]
+
+def exists_playlist_track(playlist, track):
+	cursor.execute(check_playlist_track, (playlist['id'], track['id']))
 	return list(cursor)[0][0]
 
 def get_artist(id):
@@ -191,22 +208,23 @@ def save_artist_albums(artist):
 	albums.sort(key=lambda album:album['name'].lower())  # Sort albums in alphabetical order
 	seen = set()  # Avoid duplicates(There are lots in Spotify)
 	for album in albums:
-		if album['name'] not in seen and not exists_album(album):
+		if album['name'] not in seen:
 			album = get_album(album['id'])  # Retrieves full album object
 			save_entire_album(album)
 			for artist in album['artists']:
-				if not exists_artist(artist):
-					artist = get_artist(artist['id'])
-					save_entire_artist(artist)
-				save_artist_album(artist, album)
+				artist = get_artist(artist['id'])
+				save_entire_artist(artist)
+				if not exists_artist_album(artist, album):
+					save_artist_album(artist, album)
 			seen.add(album['name'])
 
 def save_album_tracks(album):
 	tracks = album['tracks']['items']
 	for track in tracks:
-		if not exists_track(track):  # Prevents unnecessary requests
-			track = get_track(track['id'])  # Retrieves full track object
+		track = get_track(track['id'])  # Retrieves full track object
+		if not exists_track(track): 
 			save_entire_track(track)
+		if not exists_album_track(album, track):
 			save_album_track(album, track)
 
 def save_playlist_tracks(playlist):
@@ -214,65 +232,102 @@ def save_playlist_tracks(playlist):
 		track = track['track']
 		if not exists_track(track):  
 			save_entire_track(track)
-		save_playlist_track(playlist, track)
+		if not exists_playlist_track(playlist, track):
+			save_playlist_track(playlist, track)
 
 # Saves artist and all of it's relations
 def save_entire_artist(artist, save_albums=False): 
-	if not exists_artist(artist):  # Only check for those two because maybe not all albums from an artist are saved
+	if not exists_artist(artist):  # Only check for those two because maybe not all albums from an artist have been saved
 		save_artist(artist)
 		save_artist_genre(artist)
+
 	if save_albums: save_artist_albums(artist)  # If this is set in inner calls, starts artists recursion
 
 def save_entire_album(album):
-	save_album(album)
+	if not exists_album(album):
+		save_album(album)
 	save_album_tracks(album)
 
-def save_entire_track(track):
+def save_entire_track(track, save_album=False):
 	save_track(track)
 
-	if not exists_album(track['album']): # Retrieves entire album for that track
+	if save_album: # Set this flag if you want to retrieve the entire album for that track
 		album = get_album(track['album']['id'])
 		save_entire_album(album)  
 
 	for artist in track['artists']:
-		if not exists_artist(artist):
-			artist = get_artist(artist['id'])
-			save_entire_artist(artist)
+		artist = get_artist(artist['id'])
+		save_entire_artist(artist)
 		save_track_artist(track, artist)
 
 def save_entire_playlist(playlist):
-	save_playlist(playlist)
+	if not exists_playlist(playlist):
+		save_playlist(playlist)
 	save_playlist_tracks(playlist)
 
 def retrieve_all_artists(limit, starting_offset):
 	offset = starting_offset
 	for i in range(limit / 50):  # Retrieves 50 at a time(API Endpoint Max Limit/Request)
-		artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=50, offset=offset)['artists']['items']
-		for artist in artists:
-			save_entire_artist(artist, save_albums=True)
+		try:
+			artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=50, offset=offset)['artists']['items']
+			for artist in artists:
+				save_entire_artist(artist, save_albums=True)
+		except spotipy.client.SpotifyException as err:
+			print "[ERROR]", err
+			if err.startswith("http status: 401, code:-1"):  # The access token expired
+				sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+				continue
+			else:
+				raise			
 		offset += 50
 	remainder = limit % 50
 	if remainder > 0:
-		artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=remainder, offset=offset)['artists']['items']
-		for artist in artists:
-			save_entire_artist(artist, save_albums=True)
+		while True:
+			try:
+				artists = sp.search(q='year:0000-9999', type='artist', market='US', limit=remainder, offset=offset)['artists']['items']
+				for artist in artists:
+					save_entire_artist(artist, save_albums=True)
+			except spotipy.client.SpotifyException as err:
+				print "[ERROR]", err
+				if err.startswith("http status: 401, code:-1"):  # The access token expired
+					sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+					continue
+				else:
+					raise
+			break
 
 def retrieve_all_playlists(limit, starting_offset, category_id, country):
 	offset = starting_offset
 	for i in range(limit / 50):  # Retrieves 50 at a time(API Endpoint Max Limit/Request)
-		playlists = sp.category_playlists(category_id=category_id, country=country, limit=50, offset=offset)['playlists']['items']
-		for playlist in playlists:
-			if not exists_playlist(playlist):  # Prevents requesting if unnecessary
+		try:
+			playlists = sp.category_playlists(category_id=category_id, country=country, limit=50, offset=offset)['playlists']['items']
+			for playlist in playlists:
 				playlist = get_playlist(playlist['owner']['id'], playlist['id'])  # Simplified object doesn't contain all the info we need
 				save_entire_playlist(playlist)
+		except spotipy.client.SpotifyException as err:
+			print "[ERROR]", err
+			if err.startswith("http status: 401, code:-1"):  # The access token expired
+				sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+				continue
+			else:
+				raise	
 		offset += 50
 	remainder = limit % 50
 	if remainder > 0:
-		playlists = sp.category_playlists(category_id=category_id, country=country, limit=remainder, offset=offset)['playlists']['items']
-		for playlist in playlists:
-			if not exists_playlist(playlist):
-				playlist = get_playlist(playlist['owner']['id'], playlist['id'])
-				save_entire_playlist(playlist)
+		while True:
+			try:
+				playlists = sp.category_playlists(category_id=category_id, country=country, limit=remainder, offset=offset)['playlists']['items']
+				for playlist in playlists:
+					playlist = get_playlist(playlist['owner']['id'], playlist['id'])
+					save_entire_playlist(playlist)
+			except spotipy.client.SpotifyException as err:
+				print "[ERROR]", err
+				if err.startswith("http status: 401, code:-1"):  # The access token expired
+					sp.auth = util.prompt_for_user_token(username, scope, client_id = "791f489dbfac46009b49332c0897001c", client_secret = "39bfe9b8132441ab870b0157dc92bd52", redirect_uri = "https://example.com/callback/")
+					continue
+				else:
+					raise
+			break
 
 #===================================MAIN==================================#
 
