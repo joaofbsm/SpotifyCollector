@@ -14,6 +14,9 @@ __email__   = "joaofbsm@dcc.ufmg.br"
 __license__ = "GPL"
 __version__ = "3.0"
 
+# TODO
+# - If commiting, remove instance(i) print
+
 #==============================OUTPUT SETUP===============================#
 
 if len(sys.argv) > 4 and sys.argv[4] == "-v":  # Print if verbose flag was set
@@ -170,7 +173,7 @@ def get_user(id):
 
 def save_artist(artist):
 	if not artist['images']:
-		image_url = "NULL"
+		image_url = None
 	else:
 		image_url = artist['images'][0]['url']
 
@@ -188,7 +191,7 @@ def save_artist_album(artist, album):
 
 def save_album(album):
 	if not album['images']:
-		image_url = "NULL"
+		image_url = None
 	else:
 		image_url = album['images'][0]['url']
 
@@ -310,7 +313,6 @@ def retrieve_all_artists(total_limit, starting_offset):
 		# If no error occurred, go to next query		
 		total_limit -= cur_limit
 		offset += cur_limit
-
 
 def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 	offset = starting_offset
