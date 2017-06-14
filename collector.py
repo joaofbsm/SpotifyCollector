@@ -76,8 +76,8 @@ check_user = ("SELECT COUNT(1) "
 				"WHERE id = %s")
 
 insert_artist = ("INSERT INTO Artist "
-				"(id, name, followers, popularity) "
-				"VALUES (%s, %s, %s, %s)")
+				"(id, name, image_url, followers, popularity) "
+				"VALUES (%s, %s, %s, %s, %s)")
 
 insert_artist_genre = ("INSERT INTO ArtistGenre "
 						"(artist_id, genre) "
@@ -88,8 +88,8 @@ insert_artist_album = ("INSERT INTO ArtistAlbum "
 						"VALUES (%s, %s)")
 
 insert_album = ("INSERT INTO Album "
-				"(id, name, album_type, release_date, popularity) " 
-				"VALUES (%s, %s, %s, %s, %s)")
+				"(id, name, image_url, album_type, release_date, popularity) " 
+				"VALUES (%s, %s, %s, %s, %s, %s)")
 
 insert_album_track = ("INSERT INTO AlbumTrack "
 						"(album_id, track_id, disc_number, track_number) "
@@ -169,8 +169,13 @@ def get_user(id):
 	return sp.user(id)
 
 def save_artist(artist):
+	if not artist['images']:
+		image_url = "NULL"
+	else:
+		image_url = artist['images'][0]['url']
+
 	vprint("[INSERT][ARTIST]", artist['name'])
-	cursor.execute(insert_artist, (artist['id'], artist['name'], artist['followers']['total'], artist['popularity']))
+	cursor.execute(insert_artist, (artist['id'], artist['name'], image_url, artist['followers']['total'], artist['popularity']))
 
 def save_artist_genre(artist): 
 	for genre in artist['genres']:
@@ -182,8 +187,13 @@ def save_artist_album(artist, album):
 	cursor.execute(insert_artist_album, (artist['id'], album['id']))
 
 def save_album(album):
+	if not album['images']:
+		image_url = "NULL"
+	else:
+		image_url = album['images'][0]['url']
+
 	vprint("[INSERT][ALBUM]", album['name'])
-	cursor.execute(insert_album, (album['id'], album['name'], album['album_type'], album['release_date'], album['popularity']))
+	cursor.execute(insert_album, (album['id'], album['name'], image_url, album['album_type'], album['release_date'], album['popularity']))
 
 def save_album_track(album, track):
 	vprint("[INSERT][ALBUM_TRACK]", album['name'], ",", track['name'])
@@ -300,6 +310,7 @@ def retrieve_all_artists(total_limit, starting_offset):
 		# If no error occurred, go to next query		
 		total_limit -= cur_limit
 		offset += cur_limit
+
 
 def retrieve_all_playlists(total_limit, starting_offset, category_id, country):
 	offset = starting_offset
