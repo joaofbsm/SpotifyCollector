@@ -1,4 +1,4 @@
-# SpotifyCollector
+# Collectify
 This project consists of a Spotify data collector that uses the Spotify API Wrapper written in Python named [Spotipy](https://github.com/plamere/spotipy).
 
 ## Installation and environment setup
